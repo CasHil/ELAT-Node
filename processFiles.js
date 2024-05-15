@@ -70,7 +70,7 @@ async function processMetadataFiles(files, courseRunName) {
       let fileName = file["key"];
       let shortName = fileName.slice(
         fileName.indexOf(shortId) + shortId.length + 1,
-        fileName.indexOf("."),
+        fileName.indexOf(".")
       );
       fileMap[shortName] = file["value"];
     }
@@ -93,13 +93,29 @@ async function processMetadataFiles(files, courseRunName) {
       console.warn("Some files are missing");
     } else {
       let courseElementRecord = [];
+      const childParentMap = courseMetadataMap["child_parent_map"];
+      const orderMap = courseMetadataMap["order_map"];
+
       for (let elementId in courseMetadataMap["element_time_map"]) {
-        let element_start_time = new Date(
-          courseMetadataMap["element_time_map"][elementId],
+        const elementStartTime = new Date(
+          courseMetadataMap["element_time_map"][elementId]
         );
-        let week =
-          getDayDiff(courseMetadataMap["start_time"], element_start_time) / 7 +
-          1;
+        let week = -1;
+        if (elementStartTime.getTime() === 0) {
+          let parent = elementId;
+          try {
+            while (!parent.includes("chapter")) {
+              parent = childParentMap[parent];
+            }
+            week = orderMap[parent];
+          } catch (error) {
+            continue;
+          }
+        } else {
+          week =
+            getDayDiff(courseMetadataMap["start_time"], elementStartTime) / 7 +
+            1;
+        }
         let array = [
           elementId,
           courseMetadataMap["element_type_map"][elementId],
@@ -112,20 +128,20 @@ async function processMetadataFiles(files, courseRunName) {
       let enrollmentValues = processEnrollment(
         courseId,
         fileMap["student_courseenrollment-prod-analytics"],
-        courseMetadataMap,
+        courseMetadataMap
       );
 
       let certificateValues = processCertificates(
         fileMap["certificates_generatedcertificate-prod-analytics"],
         enrollmentValues,
-        courseMetadataMap,
+        courseMetadataMap
       );
 
       let learnerAuthMap = {};
       if ("auth_user-prod-analytics" in fileMap) {
         let learnerAuthMap = processAuthMap(
           fileMap["auth_user-prod-analytics"],
-          enrollmentValues,
+          enrollmentValues
         );
       }
 
@@ -134,7 +150,7 @@ async function processMetadataFiles(files, courseRunName) {
         groupMap = processGroups(
           courseId,
           fileMap["course_groups_cohortmembership-prod-analytics"],
-          enrollmentValues,
+          enrollmentValues
         );
       }
 
@@ -142,7 +158,7 @@ async function processMetadataFiles(files, courseRunName) {
         courseId,
         fileMap["auth_userprofile-prod-analytics"],
         enrollmentValues,
-        learnerAuthMap,
+        learnerAuthMap
       );
 
       // let forumInteractionRecords = processForumPostingInteraction(
@@ -363,17 +379,17 @@ function ExtractCourseInformation(files) {
             jsonObject[record]["metadata"]["display_name"];
 
           courseMetadataMap["start_date"] = new Date(
-            jsonObject[record]["metadata"]["start"],
+            jsonObject[record]["metadata"]["start"]
           );
           courseMetadataMap["end_date"] = new Date(
-            jsonObject[record]["metadata"]["end"],
+            jsonObject[record]["metadata"]["end"]
           );
 
           courseMetadataMap["start_time"] = new Date(
-            courseMetadataMap["start_date"],
+            courseMetadataMap["start_date"]
           );
           courseMetadataMap["end_time"] = new Date(
-            courseMetadataMap["end_date"],
+            courseMetadataMap["end_date"]
           );
 
           let elementPosition = 0;
@@ -384,7 +400,7 @@ function ExtractCourseInformation(files) {
             order_map[child] = elementPosition;
           }
           element_time_map[record] = new Date(
-            jsonObject[record]["metadata"]["start"],
+            jsonObject[record]["metadata"]["start"]
           );
           element_type_map[record] = jsonObject[record]["category"];
         } else {
@@ -401,7 +417,7 @@ function ExtractCourseInformation(files) {
 
           if ("start" in jsonObject[element_id]["metadata"]) {
             element_time_map[element_id] = new Date(
-              jsonObject[element_id]["metadata"]["start"],
+              jsonObject[element_id]["metadata"]["start"]
             );
           } else {
             element_without_time.push(element_id);
@@ -409,7 +425,7 @@ function ExtractCourseInformation(files) {
 
           if ("due" in jsonObject[element_id]["metadata"]) {
             element_time_map_due[element_id] = new Date(
-              jsonObject[element_id]["metadata"]["due"],
+              jsonObject[element_id]["metadata"]["due"]
             );
           }
 
@@ -437,7 +453,7 @@ function ExtractCourseInformation(files) {
           while (
             !Object.prototype.hasOwnProperty.call(
               element_time_map,
-              element_parent,
+              element_parent
             )
           ) {
             element_parent = child_parent_map[element_parent];
@@ -680,7 +696,7 @@ function processDemographics(
   courseId,
   inputFile,
   enrollmentValues,
-  learnerAuthMap,
+  learnerAuthMap
 ) {
   let learnerDemographicRecord = [];
   // hash_id	language	gender	year_of_birth	level_of_education	goals	country
