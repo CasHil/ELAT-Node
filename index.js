@@ -50,7 +50,7 @@ async function identifyLogFilesPerCourseRun(coursesDirectory, courses) {
   let directories = await fs.promises.readdir(coursesDirectory);
 
   const courseDirectoryNames = directories.filter((dirName) =>
-    courses.some((course) => dirName.includes(course)),
+    courses.some((course) => dirName.includes(course))
   );
 
   for (let courseDirectoryName of courseDirectoryNames) {
@@ -74,7 +74,7 @@ async function identifyLogFilesPerCourseRun(coursesDirectory, courses) {
           "{bar} | Identifying and verifying log files for {course_run} | {value}/{total} | Duration: {duration_formatted} | ETA: {eta_formatted}",
         clearOnComplete: true,
       },
-      cliProgress.Presets.shades_classic,
+      cliProgress.Presets.shades_classic
     );
 
     courseRunBar.start(totalFiles, 0, { course_run: courseDirectoryName });
@@ -128,7 +128,7 @@ async function processSessionsForCourseRun(courseRunDirName, logFiles) {
       format:
         " {bar} | Processing sessions for {course_run} | {value}/{total} | Duration: {duration_formatted} | ETA: {eta_formatted}",
     },
-    cliProgress.Presets.shades_classic,
+    cliProgress.Presets.shades_classic
   );
 
   const numberOfLogProcessingFunctions = 5;
@@ -163,7 +163,7 @@ async function processSessionsForCourseRun(courseRunDirName, logFiles) {
 async function processCourseRun(courseRunDirName, logFiles, coursesDirectory) {
   await readMetadataFiles(
     path.join(coursesDirectory, courseRunDirName),
-    courseRunDirName,
+    courseRunDirName
   );
   await processSessionsForCourseRun(courseRunDirName, logFiles);
 }
@@ -186,11 +186,11 @@ async function main() {
 
     const logFilesPerCourseRun = await identifyLogFilesPerCourseRun(
       workingDirectory,
-      courses,
+      courses
     );
 
     for (let [courseRunDirName, logFiles] of Object.entries(
-      logFilesPerCourseRun,
+      logFilesPerCourseRun
     )) {
       await processCourseRun(courseRunDirName, logFiles, workingDirectory);
     }

@@ -23,16 +23,16 @@ async function* readLines(logFile) {
  * @param {string[]} logFiles - The list of log files to process
  */
 async function processGeneralSessions(courseRunName, logFiles) {
-  let courseMetadataMap = await mongoQuery("metadata", {
+  const result = await mongoQuery("metadata", {
     name: courseRunName,
   });
-  courseMetadataMap = courseMetadataMap[0]["object"];
 
+  const courseMetadataMap = result[0]["object"];
   const courseId = courseMetadataMap["course_id"];
 
   const currentCourseId = courseId.slice(
-    currentCourseId.indexOf("+") + 1,
-    currentCourseId.lastIndexOf("+") + 7
+    courseId.indexOf("+") + 1,
+    courseId.lastIndexOf("+") + 7
   );
 
   for (let i = 0; i < logFiles.length; i++) {

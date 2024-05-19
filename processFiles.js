@@ -5,8 +5,6 @@ const getDayDiff = require("./helpers").getDayDiff;
 const compareDatetime = require("./helpers").compareDatetime;
 const learnerSegmentation = require("./helpers").learnerSegmentation;
 const processNull = require("./helpers").processNull;
-const cleanUnicode = require("./helpers").cleanUnicode;
-const escapeString = require("./helpers").escapeString;
 const mongoInsert = require("./databaseHelpers").mongoInsert;
 
 /**
@@ -79,7 +77,6 @@ async function processMetadataFiles(files, courseRunName) {
       "student_courseenrollment-prod-analytics",
       "certificates_generatedcertificate-prod-analytics",
       "auth_userprofile-prod-analytics",
-      "prod",
     ];
 
     if (
@@ -97,7 +94,9 @@ async function processMetadataFiles(files, courseRunName) {
         const elementStartTime = new Date(
           courseMetadataMap["element_time_map"][elementId]
         );
+
         let week = -1;
+
         if (elementStartTime.getTime() === 0) {
           let parent = elementId;
           try {
@@ -113,6 +112,11 @@ async function processMetadataFiles(files, courseRunName) {
             getDayDiff(courseMetadataMap["start_time"], elementStartTime) / 7 +
             1;
         }
+
+        if (week === -1) {
+          continue;
+        }
+
         let array = [
           elementId,
           courseMetadataMap["element_type_map"][elementId],
@@ -126,7 +130,6 @@ async function processMetadataFiles(files, courseRunName) {
         courseId,
         fileMap["student_courseenrollment-prod-analytics"],
         courseMetadataMap
-        courseMetadataMap
       );
 
       let certificateValues = processCertificates(
@@ -137,9 +140,8 @@ async function processMetadataFiles(files, courseRunName) {
 
       let learnerAuthMap = {};
       if ("auth_user-prod-analytics" in fileMap) {
-        let learnerAuthMap = processAuthMap(
+        learnerAuthMap = processAuthMap(
           fileMap["auth_user-prod-analytics"],
-          enrollmentValues
           enrollmentValues
         );
       }
@@ -150,7 +152,6 @@ async function processMetadataFiles(files, courseRunName) {
           courseId,
           fileMap["course_groups_cohortmembership-prod-analytics"],
           enrollmentValues
-          enrollmentValues
         );
       }
 
@@ -159,12 +160,6 @@ async function processMetadataFiles(files, courseRunName) {
         fileMap["auth_userprofile-prod-analytics"],
         enrollmentValues,
         learnerAuthMap
-      );
-
-      let forumInteractionRecords = processForumPostingInteraction(
-        courseId,
-        fileMap["prod"],
-        courseMetadataMap
       );
 
       let rows = [];
@@ -266,32 +261,6 @@ async function processMetadataFiles(files, courseRunName) {
           data.push(values);
         }
         await mongoInsert("learner_demographic", data);
-      }
-
-      if (forumInteractionRecords.length > 0) {
-        let data = [];
-        for (let array of forumInteractionRecords) {
-          let post_id = processNull(array[0]),
-            course_learner_id = array[1],
-            post_type = array[2],
-            post_title = cleanUnicode(array[3]),
-            post_content = cleanUnicode(array[4]),
-            post_timestamp = array[5],
-            post_parent_id = array[6],
-            post_thread_id = array[7];
-          let values = {
-            post_id: post_id,
-            course_learner_id: course_learner_id,
-            post_type: post_type,
-            post_title: post_title,
-            post_content: post_content,
-            post_timestamp: post_timestamp,
-            post_parent_id: post_parent_id,
-            post_thread_id: post_thread_id,
-          };
-          data.push(values);
-        }
-        await mongoInsert("forum_interaction", data);
       }
 
       let quizQuestionMap = courseMetadataMap["quiz_question_map"],
@@ -727,70 +696,6 @@ function processDemographics(
     }
   }
   return { learnerDemographicRecord: learnerDemographicRecord };
-}
-
-/**
- * Processing of prod file, containing forum posts, to handle learners interactions, such as posting or answering in forums
- * @param {string} courseId Current course id
- * @param {string} inputFile String with contents of the forum interaction file
- * @param {object} courseMetadataMap Object with the course metadata information
- * @returns {array} forumInteractionRecords Array with arrays of interaction records
- */
-function processForumPostingInteraction(
-  courseId,
-  inputFile,
-  courseMetadataMap
-) {
-  let forumInteractionRecords = [];
-  let lines = inputFile.split("\n");
-  for (let line of lines) {
-    if (line.length < 9) {
-      continue;
-    }
-    let jsonObject = JSON.parse(line);
-    let postId = jsonObject["_id"]["$oid"];
-    let courseLearnerId = courseId + "_" + jsonObject["author_id"];
-
-    let postType = jsonObject["_type"];
-    if (postType === "CommentThread") {
-      postType += "_" + jsonObject["thread_type"];
-    }
-    if ("parent_id" in jsonObject && jsonObject["parent_id"] !== "") {
-      postType = "Comment_Reply";
-    }
-
-    let postTitle = "";
-    if (Object.prototype.hasOwnProperty.call(jsonObject, "title")) {
-      postTitle = '"' + jsonObject["title"] + '"';
-    }
-
-    let postContent = '"' + jsonObject["body"] + '"';
-    let postTimestamp = new Date(jsonObject["created_at"]);
-
-    let postParentId = "";
-    if (Object.prototype.hasOwnProperty.call(jsonObject, "parent_id")) {
-      postParentId = jsonObject["parent_id"]["$oid"];
-    }
-
-    let postThreadId = "";
-    if (Object.prototype.hasOwnProperty.call(jsonObject, "comment_thread_id")) {
-      postThreadId = jsonObject["comment_thread_id"]["$oid"];
-    }
-    let array = [
-      postId,
-      courseLearnerId,
-      postType,
-      postTitle,
-      escapeString(postContent),
-      postTimestamp,
-      postParentId,
-      postThreadId,
-    ];
-    if (new Date(postTimestamp) < new Date(courseMetadataMap["end_time"])) {
-      forumInteractionRecords.push(array);
-    }
-  }
-  return forumInteractionRecords;
 }
 
 module.exports = { readMetadataFiles };
