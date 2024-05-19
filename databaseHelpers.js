@@ -34,7 +34,11 @@ async function testConnection(testing = dev) {
 
 async function mongoInsert(collectionName, dataRows, testing = dev) {
   const dbName = testing ? devDbName : prodDbName;
-  const client = new MongoClient(url);
+  const client = new MongoClient(url, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  });
+
   try {
     await client.connect();
     const collection = client.db(dbName).collection(collectionName);
@@ -52,7 +56,9 @@ async function mongoInsert(collectionName, dataRows, testing = dev) {
           ].includes(field)
         ) {
           let date = v[field];
-          v[field] = new Date(date);
+          if (typeof date === "string") {
+            v[field] = new Date(date);
+          }
         }
       }
     }
@@ -71,12 +77,11 @@ async function mongoQuery(
   testing = dev
 ) {
   const dbName = testing ? devDbName : prodDbName;
-  // const client = new MongoClient(url, {
-  //   useNewUrlParser: true,
-  //   useUnifiedTopology: true,
-  // });
+  const client = new MongoClient(url, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  });
 
-  const client = new MongoClient(url);
   try {
     if (collectionName === "clickstream" && dev) {
       limit = 10000;

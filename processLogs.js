@@ -1679,6 +1679,134 @@ async function processForumSessions(courseRunName, logFiles) {
   }
 }
 
+/**
+ *
+ * @param {string} courseRunName The name of the course run
+ * @param {string[]} logFiles The log files to be processed
+ */
+async function processVideoEngagementSessions(courseRunName, logFiles) {
+  // Map similar events to a unified event type
+  const eventMapping = {
+    hide_transcript: "hide_transcript",
+    "edx.video.transcript.hidden": "hide_transcript",
+    "edx.video.closed_captions.hidden": "hide_transcript",
+    "edx.video.closed_captions.shown": "show_transcript",
+    show_transcript: "show_transcript",
+    "edx.video.transcript.shown": "show_transcript",
+    load_video: "load_video",
+    "edx.video.loaded": "load_video",
+    pause_video: "pause_video",
+    "edx.video.paused": "pause_video",
+    play_video: "play_video",
+    "edx.video.played": "play_video",
+    seek_video: "seek_video",
+    "edx.video.position.changed": "seek_video",
+    speed_change_video: "speed_change_video",
+    stop_video: "stop_video",
+    "edx.video.stopped": "stop_video",
+    video_hide_cc_menu: "hide_cc_menu",
+    "edx.video.language_menu.hidden": "hide_cc_menu",
+    video_show_cc_menu: "show_cc_menu",
+    "edx.video.language_menu.shown": "show_cc_menu",
+  };
+
+  const courseMetadataMap = await mongoQuery("metadata", {
+    name: courseRunName,
+  });
+  const courseMetadata = courseMetadataMap[0]["object"];
+  const courseId = courseMetadata["course_id"];
+  const currentCourseId = courseId.slice(
+    courseId.indexOf("+") + 1,
+    courseId.lastIndexOf("+") + 7
+  );
+
+  let learnerVideoEngagement = {};
+
+  for (let logFile of logFiles) {
+    for await (const line of readLines(logFile)) {
+      if (line.length < 10 || !line.includes(currentCourseId)) {
+        continue;
+      }
+
+      const jsonObject = JSON.parse(line);
+      if (
+        !("user_id" in jsonObject["context"]) ||
+        jsonObject["context"]["user_id"] === ""
+      ) {
+        continue;
+      }
+
+      const globalLearnerId = jsonObject["context"]["user_id"];
+      const courseLearnerId = courseId + "_" + globalLearnerId;
+      const videoId = jsonObject["event"]["code"];
+      const eventType = jsonObject["event_type"];
+
+      if (!(eventType in eventMapping) || !videoId) {
+        continue;
+      }
+
+      const unifiedEventType = eventMapping[eventType];
+
+      if (!learnerVideoEngagement[courseLearnerId]) {
+        learnerVideoEngagement[courseLearnerId] = {};
+      }
+
+      if (!learnerVideoEngagement[courseLearnerId][videoId]) {
+        learnerVideoEngagement[courseLearnerId][videoId] = [];
+      }
+
+      const eventDetails = {
+        event_time: new Date(jsonObject["time"]),
+        event_type: unifiedEventType,
+        additional_info: {},
+      };
+
+      switch (unifiedEventType) {
+        case "play_video":
+        case "pause_video":
+        case "stop_video":
+          eventDetails.additional_info.currentTime = new Date(
+            jsonObject["event"]["currentTime"]
+          );
+          break;
+        case "seek_video":
+          eventDetails.additional_info.new_time =
+            jsonObject["event"]["new_time"];
+          eventDetails.additional_info.old_time =
+            jsonObject["event"]["old_time"];
+          break;
+        case "speed_change_video":
+          eventDetails.additional_info.old_speed =
+            jsonObject["event"]["old_speed"];
+          eventDetails.additional_info.new_speed =
+            jsonObject["event"]["new_speed"];
+          break;
+      }
+
+      learnerVideoEngagement[courseLearnerId][videoId].push(eventDetails);
+    }
+  }
+
+  if (Object.keys(learnerVideoEngagement).length === 0) {
+    return;
+  }
+
+  let documents = [];
+
+  for (let learnerId in learnerVideoEngagement) {
+    let videos = learnerVideoEngagement[learnerId];
+    for (let videoId in videos) {
+      videos[videoId].sort((a, b) => a.event_time - b.event_time);
+    }
+    documents.push({
+      learner_id: learnerId,
+      videos: videos,
+    });
+  }
+
+  await mongoInsert("video_engagement_sessions", documents);
+}
+
 module.exports = {
   processGeneralSessions,
   processVideoInteractionSessions,
@@ -1686,4 +1814,5 @@ module.exports = {
   processQuizSessions,
   processORASessions,
   processForumSessions,
+  processVideoEngagementSessions,
 };

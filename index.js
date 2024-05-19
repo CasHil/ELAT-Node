@@ -10,6 +10,7 @@ const {
   processAssessmentsSubmissions,
   processQuizSessions,
   processORASessions,
+  processVideoEngagementSessions,
 } = require("./processLogs");
 
 const fs = require("fs");
@@ -131,7 +132,7 @@ async function processSessionsForCourseRun(courseRunDirName, logFiles) {
     cliProgress.Presets.shades_classic
   );
 
-  const numberOfLogProcessingFunctions = 5;
+  const numberOfLogProcessingFunctions = 6;
   sessionsBar.start(numberOfLogProcessingFunctions, 0, {
     course_run: courseRunDirName,
   });
@@ -149,6 +150,9 @@ async function processSessionsForCourseRun(courseRunDirName, logFiles) {
   sessionsBar.increment();
 
   await processORASessions(courseRunDirName, logFiles);
+  sessionsBar.increment();
+
+  await processVideoEngagementSessions(courseRunDirName, logFiles);
   sessionsBar.increment();
 
   sessionsBar.stop();
