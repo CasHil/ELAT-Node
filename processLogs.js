@@ -1765,9 +1765,8 @@ async function processVideoEngagementSessions(courseRunName, logFiles) {
         case "play_video":
         case "pause_video":
         case "stop_video":
-          eventDetails.additional_info.currentTime = new Date(
-            jsonObject["event"]["currentTime"]
-          );
+          eventDetails.additional_info.currentTime =
+            jsonObject["event"]["currentTime"];
           break;
         case "seek_video":
           eventDetails.additional_info.new_time =
